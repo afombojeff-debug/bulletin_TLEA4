@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="theme-color" content="#111827">
+<title>Tle A4 · Moyenne générale</title>
+
+<style>
+:root{
+  --bg:#f4f1e8;
+  --card:#fffdf8;
+  --ink:#17233c;
+  --muted:#817a6d;
+  --line:#e4ddcd;
+  --gold:#c99a48;
+  --gold-soft:#f2e5c5;
+  --red:#b9553f;
+  --green:#3d6848;
+  --shadow:0 12px 35px rgba(28,25,18,.08);
+  --radius:22px;
+}
+
+*{box-sizing:border-box}
+
+html{
+  scroll-behavior:smooth;
+}
+
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(201,154,72,.13), transparent 28%),
+    radial-gradient(circle at 90% 15%, rgba(23,35,60,.08), transparent 25%),
+    var(--bg);
+  color:#29261f;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+button,input{
+  font:inherit;
+}
+
+button{
+  -webkit-tap-highlight-color:transparent;
+}
+
+.app{
+  width:min(100%,520px);
+  margin:auto;
+  padding:20px 18px 38px;
+}
+
+header{
+  padding:12px 4px 20px;
+}
+
+.eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.eyebrow::before{
+  content:"";
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--gold);
+  box-shadow:0 0 0 5px rgba(201,154,72,.13);
+}
+
+h1{
+  margin:8px 0 4px;
+  color:var(--ink);
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:32px;
+  line-height:1.05;
+  letter-spacing:-.04em;
+}
+
+.subtitle{
+  margin:0;
+  color:var(--muted);
+  font-size:14px;
+}
+
+.progress-card{
+  position:relative;
+  overflow:hidden;
+  margin-bottom:18px;
+  padding:17px;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+
+.progress-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:15px;
+}
+
+.progress-label{
+  color:var(--muted);
+  font-size:12px;
+}
+
+.progress-value{
+  color:var(--ink);
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+}
+
+.progress-track{
+  height:8px;
+  margin-top:11px;
+  overflow:hidden;
+  background:#eee8da;
+  border-radius:999px;
+}
+
+.progress-fill{
+  width:0%;
+  height:100%;
+  background:linear-gradient(90deg,var(--red),var(--gold),var(--ink));
+  border-radius:999px;
+  transition:width .35s cubic-bezier(.2,.8,.2,1);
+}
+
+.section{
+  margin:22px 0;
+}
+
+.section-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin:0 4px 10px;
+  color:var(--ink);
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:17px;
+}
+
+.section-count{
+  color:var(--muted);
+  font-family:Inter,sans-serif;
+  font-size:11px;
+  font-weight:600;
+}
+
+.subject-list{
+  display:grid;
+  gap:10px;
+}
+
+.subject{
+  position:relative;
+  overflow:hidden;
+  background:rgba(255,253,248,.94);
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:0 5px 18px rgba(28,25,18,.045);
+  transition:
+    transform .2s ease,
+    border-color .2s ease,
+    box-shadow .2s ease;
+}
+
+.subject:focus-within{
+  transform:translateY(-1px);
+  border-color:rgba(201,154,72,.75);
+  box-shadow:0 9px 25px rgba(28,25,18,.08);
+}
+
+.subject-main{
+  padding:14px;
+}
+
+.subject-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.subject-name{
+  color:#28251f;
+  font-size:14px;
+  font-weight:750;
+}
+
+.coef{
+  flex:0 0 auto;
+  padding:4px 8px;
+  color:#9a712b;
+  background:var(--gold-soft);
+  border:1px solid #ead5a8;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:800;
+}
+
+.notes{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+
+.note-box{
+  position:relative;
+}
+
+.note-box label{
+  display:block;
+  margin:0 0 5px 2px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:650;
+}
+
+.note-input{
+  width:100%;
+  height:45px;
+  padding:0 12px;
+  color:var(--ink);
+  background:#fbf9f3;
+  border:1px solid var(--line);
+  border-radius:12px;
+  outline:none;
+  text-align:center;
+  font-size:16px;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  transition:border-color .2s,background .2s,box-shadow .2s;
+}
+
+.note-input:focus{
+  background:#fff;
+  border-color:var(--ink);
+  box-shadow:0 0 0 3px rgba(23,35,60,.08);
+}
+
+.note-input.invalid{
+  border-color:var(--red);
+  box-shadow:0 0 0 3px rgba(185,85,63,.10);
+}
+
+.hint{
+  min-height:14px;
+  margin:7px 2px 0;
+  color:var(--red);
+  font-size:10px;
+}
+
+.summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 14px;
+  border-top:1px solid var(--line);
+  background:rgba(244,241,232,.45);
+}
+
+.summary span{
+  color:var(--muted);
+  font-size:11px;
+}
+
+.summary strong{
+  color:var(--ink);
+  font-size:12px;
+}
+
+.actions{
+  position:sticky;
+  bottom:12px;
+  z-index:5;
+  margin-top:28px;
+  padding:7px;
+  background:rgba(244,241,232,.78);
+  border:1px solid rgba(228,221,205,.8);
+  border-radius:19px;
+  box-shadow:0 12px 35px rgba(28,25,18,.12);
+  backdrop-filter:blur(14px);
+}
+
+.calculate{
+  position:relative;
+  width:100%;
+  min-height:54px;
+  overflow:hidden;
+  border:0;
+  border-radius:14px;
+  color:#fff;
+  background:var(--ink);
+  cursor:pointer;
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.01em;
+  transition:transform .15s,filter .15s;
+}
+
+.calculate::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.16) 50%,transparent 75%);
+  transform:translateX(-120%);
+}
+
+.calculate:hover::after{
+  animation:shine .8s ease;
+}
+
+.calculate:active{
+  transform:scale(.985);
+}
+
+@keyframes shine{
+  to{transform:translateX(120%)}
+}
+
+.reset{
+  display:block;
+  margin:11px auto 0;
+  padding:4px 8px;
+  color:var(--red);
+  background:transparent;
+  border:0;
+  cursor:pointer;
+  font-size:11px;
+  font-weight:650;
+}
+
+.result{
+  display:none;
+  margin-top:18px;
+  padding:22px 18px;
+  text-align:center;
+  background:var(--card);
+  border:1px solid var(--gold-soft);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  animation:resultIn .42s cubic-bezier(.2,.8,.2,1);
+}
+
+.result.show{
+  display:block;
+}
+
+@keyframes resultIn{
+  from{opacity:0;transform:translateY(12px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+.result-label{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:650;
+}
+
+.result-number{
+  margin:4px 0;
+  color:var(--ink);
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:52px;
+  line-height:1;
+  font-weight:700;
+  letter-spacing:-.05em;
+}
+
+.result-number small{
+  color:var(--muted);
+  font-family:Inter,sans-serif;
+  font-size:15px;
+  letter-spacing:0;
+}
+
+.result-appreciation{
+  margin-top:8px;
+  font-size:14px;
+  font-weight:800;
+}
+
+.result-details{
+  display:flex;
+  justify-content:center;
+  gap:24px;
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+}
+
+.detail strong{
+  display:block;
+  color:var(--ink);
+  font-size:14px;
+}
+
+.detail span{
+  color:var(--muted);
+  font-size:10px;
+}
+
+.message{
+  margin-top:10px;
+  color:var(--red);
+  font-size:12px;
+  line-height:1.45;
+}
+
+footer{
+  margin-top:30px;
+  color:var(--muted);
+  text-align:center;
+  font-size:11px;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<header>
+  <div class="eyebrow">Bulletin · Tle A4</div>
+  <h1>Moyenne générale</h1>
+  <p class="subtitle">Saisis tes deux séquences, puis calcule ton résultat.</p>
+</header>
+
+<div class="progress-card">
+  <div class="progress-top">
+    <span class="progress-label">Notes renseignées</span>
+    <span class="progress-value" id="progressValue">0 / 28</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+</div>
+
+<main id="subjects"></main>
+
+<div class="actions">
+  <button class="calculate" id="calculateBtn" type="button">
+    Calculer la moyenne générale
+  </button>
+  <button class="reset" id="resetBtn" type="button">
+    Réinitialiser les notes
+  </button>
+</div>
+
+<section class="result" id="result" aria-live="polite">
+  <div class="result-label">Ta moyenne générale</div>
+  <div class="result-number" id="resultNumber">—<small>/20</small></div>
+  <div class="result-appreciation" id="resultAppreciation"></div>
+
+  <div class="result-details">
+    <div class="detail">
+      <strong id="resultPoints">0</strong>
+      <span>points pondérés</span>
+    </div>
+    <div class="detail">
+      <strong id="resultCoef">0 / 31</strong>
+      <span>coefficients utilisés</span>
+    </div>
+  </div>
+
+  <div class="message" id="resultMessage"></div>
+</section>
+
+<footer>
+  Tle A4 • par Afombo Jeff • 679740340
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SUBJECTS = [
+    {id:"anglais", name:"Anglais", coef:4, group:"Langues"},
+    {id:"espagnol", name:"Espagnol", coef:4, group:"Langues"},
+    {id:"lfr", name:"Langue française", coef:2, group:"Langues"},
+    {id:"lcn", name:"LCN", coef:1, group:"Langues"},
+
+    {id:"litterature", name:"Littérature", coef:3, group:"Lettres et sciences humaines"},
+    {id:"philosophie", name:"Philosophie", coef:3, group:"Lettres et sciences humaines"},
+    {id:"histoire", name:"Histoire", coef:2, group:"Lettres et sciences humaines"},
+    {id:"geographie", name:"Géographie", coef:2, group:"Lettres et sciences humaines"},
+    {id:"ecm", name:"ECM", coef:2, group:"Lettres et sciences humaines"},
+
+    {id:"maths", name:"Mathématiques", coef:2, group:"Sciences"},
+    {id:"svt", name:"SVT", coef:1, group:"Sciences"},
+    {id:"informatique", name:"Informatique", coef:2, group:"Sciences"},
+
+    {id:"eps", name:"EPS", coef:2, group:"Autres disciplines"},
+    {id:"tm", name:"TM", coef:1, group:"Autres disciplines"}
+  ];
+
+  const TOTAL_COEF = SUBJECTS.reduce((sum,s) => sum + s.coef, 0);
+  const TOTAL_FIELDS = SUBJECTS.length * 2;
+  const STORAGE_KEY = "tleA4NotesFinalV1";
+
+  const subjectsEl = document.getElementById("subjects");
+  const progressValue = document.getElementById("progressValue");
+  const progressFill = document.getElementById("progressFill");
+
+  const result = document.getElementById("result");
+  const resultNumber = document.getElementById("resultNumber");
+  const resultAppreciation = document.getElementById("resultAppreciation");
+  const resultPoints = document.getElementById("resultPoints");
+  const resultCoef = document.getElementById("resultCoef");
+  const resultMessage = document.getElementById("resultMessage");
+
+  let state = load();
+
+  function load(){
+    try{
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      return data && typeof data === "object" ? data : {};
+    }catch(e){
+      return {};
+    }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){}
+  }
+
+  function parseNote(value){
+    if(value === null || value === undefined || String(value).trim() === ""){
+      return null;
+    }
+
+    const number = Number(String(value).trim().replace(",", "."));
+
+    if(!Number.isFinite(number)) return null;
+
+    return Math.min(20, Math.max(0, number));
+  }
+
+  function format(value){
+    if(!Number.isFinite(value)) return "—";
+    return Number(value.toFixed(2)).toString().replace(".", ",");
+  }
+
+  function appreciation(value){
+    if(value >= 16) return "Excellent";
+    if(value >= 14) return "Bien";
+    if(value >= 12) return "Assez bien";
+    if(value >= 10) return "Passable";
+    return "Insuffisant";
+  }
+
+  function createGroups(){
+    const groups = [];
+
+    SUBJECTS.forEach(subject => {
+      let group = groups.find(g => g.name === subject.group);
+
+      if(!group){
+        group = {name:subject.group, items:[]};
+        groups.push(group);
+      }
+
+      group.items.push(subject);
+    });
+
+    return groups;
+  }
+
+  function render(){
+    subjectsEl.innerHTML = "";
+
+    createGroups().forEach(group => {
+      const section = document.createElement("section");
+      section.className = "section";
+
+      const title = document.createElement("h2");
+      title.className = "section-title";
+      title.innerHTML =
+        `<span>${group.name}</span><span class="section-count">${group.items.length} matière${group.items.length > 1 ? "s" : ""}</span>`;
+
+      const list = document.createElement("div");
+      list.className = "subject-list";
+
+      group.items.forEach(subject => {
+        const card = document.createElement("article");
+        card.className = "subject";
+
+        const saved = state[subject.id] || {};
+
+        card.innerHTML = `
+          <div class="subject-main">
+            <div class="subject-head">
+              <span class="subject-name">${subject.name}</span>
+              <span class="coef">COEF ${subject.coef}</span>
+            </div>
+
+            <div class="notes">
+              <div class="note-box">
+                <label for="${subject.id}-s1">SÉQUENCE 1</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s1"
+                  type="number"
+                  inputmode="decimal"
+                  min="0"
+                  max="20"
+                  step="0.25"
+                  placeholder="—"
+                  value="${saved.s1 ?? ""}"
+                >
+              </div>
+
+              <div class="note-box">
+                <label for="${subject.id}-s2">SÉQUENCE 2</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s2"
+                  type="number"
+                  inputmode="decimal"
+                  min="0"
+                  max="20"
+                  step="0.25"
+                  placeholder="—"
+                  value="${saved.s2 ?? ""}"
+                >
+              </div>
+            </div>
+
+            <div class="hint" id="${subject.id}-hint"></div>
+          </div>
+
+          <div class="summary">
+            <span>Coefficient pris en compte après calcul</span>
+            <strong>${subject.coef}</strong>
+          </div>
+        `;
+
+        list.appendChild(card);
+
+        const s1 = card.querySelector(`#${subject.id}-s1`);
+        const s2 = card.querySelector(`#${subject.id}-s2`);
+
+        function handleInput(){
+          const v1 = parseNote(s1.value);
+          const v2 = parseNote(s2.value);
+
+          state[subject.id] = {
+            s1: v1,
+            s2: v2
+          };
+
+          save();
+          validateInput(s1);
+          validateInput(s2);
+          updateProgress();
+
+          // Une modification rend le résultat précédent obsolète.
+          result.classList.remove("show");
+        }
+
+        s1.addEventListener("input", handleInput);
+        s2.addEventListener("input", handleInput);
+
+        s1.addEventListener("blur", () => normalizeInput(s1));
+        s2.addEventListener("blur", () => normalizeInput(s2));
+      });
+
+      section.appendChild(title);
+      section.appendChild(list);
+      subjectsEl.appendChild(section);
+    });
+
+    updateProgress();
+  }
+
+  function normalizeInput(input){
+    const value = parseNote(input.value);
+
+    if(value === null){
+      input.value = "";
+      input.classList.remove("invalid");
+      return;
+    }
+
+    input.value = format(value);
+    input.classList.remove("invalid");
+
+    const id = input.id;
+    const split = id.lastIndexOf("-");
+    const subjectId = id.substring(0, split);
+    const sequence = id.substring(split + 1);
+
+    if(!state[subjectId]) state[subjectId] = {};
+    state[subjectId][sequence] = value;
+
+    save();
+  }
+
+  function validateInput(input){
+    if(input.value === "") {
+      input.classList.remove("invalid");
+      return true;
+    }
+
+    const value = parseNote(input.value);
+    const valid = value !== null && value >= 0 && value <= 20;
+
+    input.classList.toggle("invalid", !valid);
+    return valid;
+  }
+
+  function updateProgress(){
+    let filled = 0;
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+      if(parseNote(entry.s1) !== null) filled++;
+      if(parseNote(entry.s2) !== null) filled++;
+    });
+
+    const percent = (filled / TOTAL_FIELDS) * 100;
+
+    progressValue.textContent = `${filled} / ${TOTAL_FIELDS}`;
+    progressFill.style.width = `${percent}%`;
+  }
+
+  function calculate(){
+    let weightedPoints = 0;
+    let usedCoef = 0;
+    let incomplete = [];
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+      const s1 = parseNote(entry.s1);
+      const s2 = parseNote(entry.s2);
+
+      if(s1 === null || s2 === null){
+        incomplete.push(subject.name);
+        return;
+      }
+
+      const trimesterAverage = (s1 + s2) / 2;
+
+      weightedPoints += trimesterAverage * subject.coef;
+      usedCoef += subject.coef;
+    });
+
+    if(usedCoef === 0){
+      resultNumber.innerHTML = `—<small>/20</small>`;
+      resultAppreciation.textContent = "";
+      resultPoints.textContent = "0";
+      resultCoef.textContent = `0 / ${TOTAL_COEF}`;
+      resultMessage.textContent = "Renseigne au moins une matière avec ses deux séquences.";
+      result.classList.add("show");
+      result.scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+
+    const average = weightedPoints / usedCoef;
+
+    resultNumber.innerHTML = `${format(average)}<small>/20</small>`;
+    resultAppreciation.textContent = appreciation(average);
+    resultPoints.textContent = format(weightedPoints);
+    resultCoef.textContent = `${usedCoef} / ${TOTAL_COEF}`;
+
+    if(incomplete.length === 0){
+      resultMessage.textContent =
+        "Toutes les matières sont prises en compte.";
+    }else{
+      resultMessage.textContent =
+        `${incomplete.length} matière${incomplete.length > 1 ? "s" : ""} non comptabilisée${incomplete.length > 1 ? "s" : ""} car les deux séquences ne sont pas renseignées.`;
+    }
+
+    result.classList.add("show");
+    result.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  document.getElementById("calculateBtn").addEventListener("click", calculate);
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if(!confirm("Effacer toutes les notes ?")) return;
+
+    state = {};
+
+    try{
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem("tleA4NotesV1");
+      localStorage.removeItem("tleA4NotesV2");
+    }catch(e){}
+
+    render();
+
+    result.classList.remove("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+
+  render();
+
+})();
+</script>
+</body>
+</html>
