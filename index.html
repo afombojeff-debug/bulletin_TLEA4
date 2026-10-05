@@ -600,7 +600,9 @@ Tle A4 • par Afombo Jeff • 679740340
 
     if(!Number.isFinite(number)) return null;
 
-    return Math.min(20, Math.max(0, number));
+    if(number < 0 || number > 20) return null;
+
+    return number;
   }
 
   function format(value){
@@ -667,13 +669,11 @@ Tle A4 • par Afombo Jeff • 679740340
                 <input
                   class="note-input"
                   id="${subject.id}-s1"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  max="20"
-                  step="0.25"
+                  autocomplete="off"
                   placeholder="—"
-                  value="${saved.s1 ?? ""}"
+                  value="${saved.s1 != null ? format(saved.s1) : ""}"
                 >
               </div>
 
@@ -682,13 +682,11 @@ Tle A4 • par Afombo Jeff • 679740340
                 <input
                   class="note-input"
                   id="${subject.id}-s2"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  max="20"
-                  step="0.25"
+                  autocomplete="off"
                   placeholder="—"
-                  value="${saved.s2 ?? ""}"
+                  value="${saved.s2 != null ? format(saved.s2) : ""}"
                 >
               </div>
             </div>
@@ -706,6 +704,7 @@ Tle A4 • par Afombo Jeff • 679740340
 
         const s1 = card.querySelector(`#${subject.id}-s1`);
         const s2 = card.querySelector(`#${subject.id}-s2`);
+        const hint = card.querySelector(`#${subject.id}-hint`);
 
         function handleInput(){
           const v1 = parseNote(s1.value);
@@ -717,8 +716,9 @@ Tle A4 • par Afombo Jeff • 679740340
           };
 
           save();
-          validateInput(s1);
-          validateInput(s2);
+          const ok1 = validateInput(s1);
+          const ok2 = validateInput(s2);
+          hint.textContent = (ok1 && ok2) ? "" : "Note invalide : saisis un nombre entre 0 et 20.";
           updateProgress();
 
           // Une modification rend le résultat précédent obsolète.
@@ -743,9 +743,14 @@ Tle A4 • par Afombo Jeff • 679740340
   function normalizeInput(input){
     const value = parseNote(input.value);
 
-    if(value === null){
+    if(input.value.trim() === ""){
       input.value = "";
       input.classList.remove("invalid");
+      return;
+    }
+
+    if(value === null){
+      input.classList.add("invalid");
       return;
     }
 
@@ -928,7 +933,9 @@ Tle A4 • par Afombo Jeff • 679740340
 
     if(!Number.isFinite(number)) return null;
 
-    return Math.min(20, Math.max(0, number));
+    if(number < 0 || number > 20) return null;
+
+    return number;
   }
 
   function format(value){
@@ -995,13 +1002,11 @@ Tle A4 • par Afombo Jeff • 679740340
                 <input
                   class="note-input"
                   id="${subject.id}-s1"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  max="20"
-                  step="0.25"
+                  autocomplete="off"
                   placeholder="—"
-                  value="${saved.s1 ?? ""}"
+                  value="${saved.s1 != null ? format(saved.s1) : ""}"
                 >
               </div>
 
@@ -1010,13 +1015,11 @@ Tle A4 • par Afombo Jeff • 679740340
                 <input
                   class="note-input"
                   id="${subject.id}-s2"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  max="20"
-                  step="0.25"
+                  autocomplete="off"
                   placeholder="—"
-                  value="${saved.s2 ?? ""}"
+                  value="${saved.s2 != null ? format(saved.s2) : ""}"
                 >
               </div>
             </div>
@@ -1034,6 +1037,7 @@ Tle A4 • par Afombo Jeff • 679740340
 
         const s1 = card.querySelector(`#${subject.id}-s1`);
         const s2 = card.querySelector(`#${subject.id}-s2`);
+        const hint = card.querySelector(`#${subject.id}-hint`);
 
         function handleInput(){
           const v1 = parseNote(s1.value);
@@ -1045,8 +1049,9 @@ Tle A4 • par Afombo Jeff • 679740340
           };
 
           save();
-          validateInput(s1);
-          validateInput(s2);
+          const ok1 = validateInput(s1);
+          const ok2 = validateInput(s2);
+          hint.textContent = (ok1 && ok2) ? "" : "Note invalide : saisis un nombre entre 0 et 20.";
           updateProgress();
 
           // Une modification rend le résultat précédent obsolète.
@@ -1071,9 +1076,14 @@ Tle A4 • par Afombo Jeff • 679740340
   function normalizeInput(input){
     const value = parseNote(input.value);
 
-    if(value === null){
+    if(input.value.trim() === ""){
       input.value = "";
       input.classList.remove("invalid");
+      return;
+    }
+
+    if(value === null){
+      input.classList.add("invalid");
       return;
     }
 
