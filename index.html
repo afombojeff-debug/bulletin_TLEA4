@@ -428,6 +428,8 @@ footer{
 <nav class="tabs" role="tablist" aria-label="Choix de la classe">
   <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="a4">Tle A4</button>
   <button class="tab" type="button" role="tab" aria-selected="false" data-tab="d">Tle D</button>
+  <!-- NOUVEAU : onglet 1ère A4 -->
+  <button class="tab" type="button" role="tab" aria-selected="false" data-tab="p">1ère A4</button>
 </nav>
 
 <!-- ===================== ONGLET A4 (code d'origine) ===================== -->
@@ -529,6 +531,56 @@ footer{
 
 </div>
 <!-- ===================== FIN ONGLET TLE D ===================== -->
+
+<!-- ===================== NOUVEAU : ONGLET 1ÈRE A4 ===================== -->
+<div class="panel" id="panel-p">
+
+<header>
+  <div class="eyebrow">Bulletin · 1ère A4</div>
+  <h1>Moyenne générale</h1>
+  <p class="subtitle">Saisis tes deux séquences, puis calcule ton résultat.</p>
+</header>
+
+<div class="progress-card">
+  <div class="progress-top">
+    <span class="progress-label">Notes renseignées</span>
+    <span class="progress-value" id="progressValueP">0 / 28</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFillP"></div>
+  </div>
+</div>
+
+<main id="subjectsP"></main>
+
+<div class="actions">
+  <button class="calculate" id="calculateBtnP" type="button">
+    Calculer la moyenne générale
+  </button>
+  <button class="reset" id="resetBtnP" type="button">
+    Réinitialiser les notes
+  </button>
+</div>
+
+<section class="result" id="resultP" aria-live="polite">
+  <div class="result-label">Ta moyenne générale</div>
+  <div class="result-number" id="resultNumberP">—<small>/20</small></div>
+  <div class="result-appreciation" id="resultAppreciationP"></div>
+  <div class="result-details">
+    <div class="detail">
+      <strong id="resultPointsP">0</strong>
+      <span>points pondérés</span>
+    </div>
+    <div class="detail">
+      <strong id="resultCoefP">0 / 29</strong>
+      <span>coefficients utilisés</span>
+    </div>
+  </div>
+  <div class="message" id="resultMessageP"></div>
+</section>
+
+</div>
+<!-- ===================== FIN ONGLET 1ÈRE A4 ===================== -->
 
 <footer>
 Tle A4 • par Afombo Jeff • 679740340
@@ -1200,7 +1252,339 @@ Tle A4 • par Afombo Jeff • 679740340
 })();
 </script>
 
-<!-- ===================== AJOUT : gestion des onglets ===================== -->
+<!-- ===================== NOUVEAU : SCRIPT 1ÈRE A4 (même logique, données et IDs propres) ===================== -->
+<script>
+(function(){
+  "use strict";
+
+  const SUBJECTS = [
+    {id:"p-anglais", name:"Anglais", coef:4, group:"Langues"},
+    {id:"p-lv2", name:"Langue vivante 2", coef:3, group:"Langues"},
+    {id:"p-lfr", name:"Langue française", coef:2, group:"Langues"},
+    {id:"p-lcn", name:"LCN", coef:1, group:"Langues"},
+
+    {id:"p-litterature", name:"Littérature", coef:3, group:"Lettres et sciences humaines"},
+    {id:"p-philosophie", name:"Philosophie", coef:2, group:"Lettres et sciences humaines"},
+    {id:"p-histoire", name:"Histoire", coef:2, group:"Lettres et sciences humaines"},
+    {id:"p-geographie", name:"Géographie", coef:2, group:"Lettres et sciences humaines"},
+    {id:"p-ecm", name:"ECM", coef:2, group:"Lettres et sciences humaines"},
+
+    {id:"p-maths", name:"Mathématiques", coef:2, group:"Sciences"},
+    {id:"p-svt", name:"SVT", coef:1, group:"Sciences"},
+    {id:"p-informatique", name:"Informatique", coef:2, group:"Sciences"},
+
+    {id:"p-eps", name:"EPS", coef:2, group:"Autres disciplines"},
+    {id:"p-tm", name:"TM", coef:1, group:"Autres disciplines"}
+  ];
+
+  const TOTAL_COEF = SUBJECTS.reduce((sum,s) => sum + s.coef, 0);
+  const TOTAL_FIELDS = SUBJECTS.length * 2;
+  const STORAGE_KEY = "prem1A4NotesV1";
+
+  const subjectsEl = document.getElementById("subjectsP");
+  const progressValue = document.getElementById("progressValueP");
+  const progressFill = document.getElementById("progressFillP");
+  const result = document.getElementById("resultP");
+  const resultNumber = document.getElementById("resultNumberP");
+  const resultAppreciation = document.getElementById("resultAppreciationP");
+  const resultPoints = document.getElementById("resultPointsP");
+  const resultCoef = document.getElementById("resultCoefP");
+  const resultMessage = document.getElementById("resultMessageP");
+
+  let state = load();
+
+  function load(){
+    try{
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      return data && typeof data === "object" ? data : {};
+    }catch(e){
+      return {};
+    }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){}
+  }
+
+  function parseNote(value){
+    if(value === null || value === undefined || String(value).trim() === ""){
+      return null;
+    }
+
+    const number = Number(String(value).trim().replace(",", "."));
+
+    if(!Number.isFinite(number)) return null;
+
+    if(number < 0 || number > 20) return null;
+
+    return number;
+  }
+
+  function format(value){
+    if(!Number.isFinite(value)) return "—";
+    return Number(value.toFixed(2)).toString().replace(".", ",");
+  }
+
+  function appreciation(value){
+    if(value >= 16) return "Excellent";
+    if(value >= 14) return "Bien";
+    if(value >= 12) return "Assez bien";
+    if(value >= 10) return "Passable";
+    return "Insuffisant";
+  }
+
+  function createGroups(){
+    const groups = [];
+
+    SUBJECTS.forEach(subject => {
+      let group = groups.find(g => g.name === subject.group);
+
+      if(!group){
+        group = {name:subject.group, items:[]};
+        groups.push(group);
+      }
+
+      group.items.push(subject);
+    });
+
+    return groups;
+  }
+
+  function render(){
+    subjectsEl.innerHTML = "";
+
+    createGroups().forEach(group => {
+      const section = document.createElement("section");
+      section.className = "section";
+
+      const title = document.createElement("h2");
+      title.className = "section-title";
+      title.innerHTML =
+        `<span>${group.name}</span><span class="section-count">${group.items.length} matière${group.items.length > 1 ? "s" : ""}</span>`;
+
+      const list = document.createElement("div");
+      list.className = "subject-list";
+
+      group.items.forEach(subject => {
+        const card = document.createElement("article");
+        card.className = "subject";
+
+        const saved = state[subject.id] || {};
+
+        card.innerHTML = `
+          <div class="subject-main">
+            <div class="subject-head">
+              <span class="subject-name">${subject.name}</span>
+              <span class="coef">COEF ${subject.coef}</span>
+            </div>
+
+            <div class="notes">
+              <div class="note-box">
+                <label for="${subject.id}-s1">SÉQUENCE 1</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s1"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="—"
+                  value="${saved.s1 != null ? format(saved.s1) : ""}"
+                >
+              </div>
+
+              <div class="note-box">
+                <label for="${subject.id}-s2">SÉQUENCE 2</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s2"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="—"
+                  value="${saved.s2 != null ? format(saved.s2) : ""}"
+                >
+              </div>
+            </div>
+
+            <div class="hint" id="${subject.id}-hint"></div>
+          </div>
+
+          <div class="summary">
+            <span>Coefficient pris en compte après calcul</span>
+            <strong>${subject.coef}</strong>
+          </div>
+        `;
+
+        list.appendChild(card);
+
+        const s1 = card.querySelector(`#${subject.id}-s1`);
+        const s2 = card.querySelector(`#${subject.id}-s2`);
+        const hint = card.querySelector(`#${subject.id}-hint`);
+
+        function handleInput(){
+          const v1 = parseNote(s1.value);
+          const v2 = parseNote(s2.value);
+
+          state[subject.id] = {
+            s1: v1,
+            s2: v2
+          };
+
+          save();
+          const ok1 = validateInput(s1);
+          const ok2 = validateInput(s2);
+          hint.textContent = (ok1 && ok2) ? "" : "Note invalide : saisis un nombre entre 0 et 20.";
+          updateProgress();
+
+          // Une modification rend le résultat précédent obsolète.
+          result.classList.remove("show");
+        }
+
+        s1.addEventListener("input", handleInput);
+        s2.addEventListener("input", handleInput);
+
+        s1.addEventListener("blur", () => normalizeInput(s1));
+        s2.addEventListener("blur", () => normalizeInput(s2));
+      });
+
+      section.appendChild(title);
+      section.appendChild(list);
+      subjectsEl.appendChild(section);
+    });
+
+    updateProgress();
+  }
+
+  function normalizeInput(input){
+    const value = parseNote(input.value);
+
+    if(input.value.trim() === ""){
+      input.value = "";
+      input.classList.remove("invalid");
+      return;
+    }
+
+    if(value === null){
+      input.classList.add("invalid");
+      return;
+    }
+
+    input.value = format(value);
+    input.classList.remove("invalid");
+
+    const id = input.id;
+    const split = id.lastIndexOf("-");
+    const subjectId = id.substring(0, split);
+    const sequence = id.substring(split + 1);
+
+    if(!state[subjectId]) state[subjectId] = {};
+    state[subjectId][sequence] = value;
+    save();
+  }
+
+  function validateInput(input){
+    if(input.value === "") {
+      input.classList.remove("invalid");
+      return true;
+    }
+
+    const value = parseNote(input.value);
+    const valid = value !== null && value >= 0 && value <= 20;
+
+    input.classList.toggle("invalid", !valid);
+    return valid;
+  }
+
+  function updateProgress(){
+    let filled = 0;
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+
+      if(parseNote(entry.s1) !== null) filled++;
+      if(parseNote(entry.s2) !== null) filled++;
+    });
+
+    const percent = (filled / TOTAL_FIELDS) * 100;
+
+    progressValue.textContent = `${filled} / ${TOTAL_FIELDS}`;
+    progressFill.style.width = `${percent}%`;
+  }
+
+  function calculate(){
+    let weightedPoints = 0;
+    let usedCoef = 0;
+    let incomplete = [];
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+      const s1 = parseNote(entry.s1);
+      const s2 = parseNote(entry.s2);
+
+      if(s1 === null || s2 === null){
+        incomplete.push(subject.name);
+        return;
+      }
+
+      const trimesterAverage = (s1 + s2) / 2;
+
+      weightedPoints += trimesterAverage * subject.coef;
+      usedCoef += subject.coef;
+    });
+
+    if(usedCoef === 0){
+      resultNumber.innerHTML = `—<small>/20</small>`;
+      resultAppreciation.textContent = "";
+      resultPoints.textContent = "0";
+      resultCoef.textContent = `0 / ${TOTAL_COEF}`;
+      resultMessage.textContent = "Renseigne au moins une matière avec ses deux séquences.";
+      result.classList.add("show");
+      result.scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+
+    const average = weightedPoints / usedCoef;
+
+    resultNumber.innerHTML = `${format(average)}<small>/20</small>`;
+    resultAppreciation.textContent = appreciation(average);
+    resultPoints.textContent = format(weightedPoints);
+    resultCoef.textContent = `${usedCoef} / ${TOTAL_COEF}`;
+
+    if(incomplete.length === 0){
+      resultMessage.textContent =
+        "Toutes les matières sont prises en compte.";
+    }else{
+      resultMessage.textContent =
+        `${incomplete.length} matière${incomplete.length > 1 ? "s" : ""} non comptabilisée${incomplete.length > 1 ? "s" : ""} car les deux séquences ne sont pas renseignées.`;
+    }
+
+    result.classList.add("show");
+    result.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  document.getElementById("calculateBtnP").addEventListener("click", calculate);
+
+  document.getElementById("resetBtnP").addEventListener("click", () => {
+    if(!confirm("Effacer toutes les notes ?")) return;
+
+    state = {};
+
+    try{
+      localStorage.removeItem(STORAGE_KEY);
+    }catch(e){}
+
+    render();
+    result.classList.remove("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+
+  render();
+})();
+</script>
+
+<!-- ===================== AJOUT : gestion des onglets (seule ligne étendue : "p" ajouté à panels) ===================== -->
 <script>
 (function(){
   "use strict";
@@ -1209,7 +1593,8 @@ Tle A4 • par Afombo Jeff • 679740340
   const tabs = document.querySelectorAll(".tab");
   const panels = {
     a4: document.getElementById("panel-a4"),
-    d: document.getElementById("panel-d")
+    d: document.getElementById("panel-d"),
+    p: document.getElementById("panel-p")
   };
 
   function show(key, scroll){
