@@ -430,6 +430,8 @@ footer{
   <button class="tab" type="button" role="tab" aria-selected="false" data-tab="d">Tle D</button>
   <!-- NOUVEAU : onglet 1ère A4 -->
   <button class="tab" type="button" role="tab" aria-selected="false" data-tab="p">1ère A4</button>
+  <!-- NOUVEAU : onglet Tle TI -->
+  <button class="tab" type="button" role="tab" aria-selected="false" data-tab="ti">Tle TI</button>
 </nav>
 
 <!-- ===================== ONGLET A4 (code d'origine) ===================== -->
@@ -581,6 +583,56 @@ footer{
 
 </div>
 <!-- ===================== FIN ONGLET 1ÈRE A4 ===================== -->
+
+<!-- ===================== NOUVEAU : ONGLET TLE TI ===================== -->
+<div class="panel" id="panel-ti">
+
+<header>
+  <div class="eyebrow">Bulletin · Tle TI</div>
+  <h1>Moyenne générale</h1>
+  <p class="subtitle">Saisis tes deux séquences, puis calcule ton résultat.</p>
+</header>
+
+<div class="progress-card">
+  <div class="progress-top">
+    <span class="progress-label">Notes renseignées</span>
+    <span class="progress-value" id="progressValueT">0 / 28</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFillT"></div>
+  </div>
+</div>
+
+<main id="subjectsT"></main>
+
+<div class="actions">
+  <button class="calculate" id="calculateBtnT" type="button">
+    Calculer la moyenne générale
+  </button>
+  <button class="reset" id="resetBtnT" type="button">
+    Réinitialiser les notes
+  </button>
+</div>
+
+<section class="result" id="resultT" aria-live="polite">
+  <div class="result-label">Ta moyenne générale</div>
+  <div class="result-number" id="resultNumberT">—<small>/20</small></div>
+  <div class="result-appreciation" id="resultAppreciationT"></div>
+  <div class="result-details">
+    <div class="detail">
+      <strong id="resultPointsT">0</strong>
+      <span>points pondérés</span>
+    </div>
+    <div class="detail">
+      <strong id="resultCoefT">0 / 33</strong>
+      <span>coefficients utilisés</span>
+    </div>
+  </div>
+  <div class="message" id="resultMessageT"></div>
+</section>
+
+</div>
+<!-- ===================== FIN ONGLET TLE TI ===================== -->
 
 <footer>
 Tle A4 • par Afombo Jeff • 679740340
@@ -1584,6 +1636,338 @@ Tle A4 • par Afombo Jeff • 679740340
 })();
 </script>
 
+<!-- ===================== NOUVEAU : SCRIPT TLE TI (même logique, données et IDs propres) ===================== -->
+<script>
+(function(){
+  "use strict";
+
+  const SUBJECTS = [
+    {id:"t-maths", name:"Mathématiques", coef:4, group:"Sciences et technologie"},
+    {id:"t-physique", name:"Physique", coef:2, group:"Sciences et technologie"},
+    {id:"t-chimie", name:"Chimie", coef:1, group:"Sciences et technologie"},
+    {id:"t-programmation", name:"Programmation", coef:3, group:"Sciences et technologie"},
+    {id:"t-si", name:"Système d'information", coef:4, group:"Sciences et technologie"},
+    {id:"t-risi", name:"RISI", coef:2, group:"Sciences et technologie"},
+    {id:"t-cpi", name:"CPI", coef:2, group:"Sciences et technologie"},
+
+    {id:"t-ecm", name:"ECM", coef:2, group:"Lettres et sciences humaines"},
+    {id:"t-geographie", name:"Géographie", coef:2, group:"Lettres et sciences humaines"},
+    {id:"t-philosophie", name:"Philosophie", coef:3, group:"Lettres et sciences humaines"},
+    {id:"t-litterature", name:"Littérature", coef:1.5, group:"Lettres et sciences humaines"},
+
+    {id:"t-langue", name:"Langue", coef:1.5, group:"Langues"},
+    {id:"t-anglais", name:"Anglais", coef:3, group:"Langues"},
+
+    {id:"t-eps", name:"EPS", coef:2, group:"Autres disciplines"}
+  ];
+
+  const TOTAL_COEF = SUBJECTS.reduce((sum,s) => sum + s.coef, 0);
+  const TOTAL_FIELDS = SUBJECTS.length * 2;
+  const STORAGE_KEY = "tleTINotesV1";
+
+  const subjectsEl = document.getElementById("subjectsT");
+  const progressValue = document.getElementById("progressValueT");
+  const progressFill = document.getElementById("progressFillT");
+  const result = document.getElementById("resultT");
+  const resultNumber = document.getElementById("resultNumberT");
+  const resultAppreciation = document.getElementById("resultAppreciationT");
+  const resultPoints = document.getElementById("resultPointsT");
+  const resultCoef = document.getElementById("resultCoefT");
+  const resultMessage = document.getElementById("resultMessageT");
+
+  let state = load();
+
+  function load(){
+    try{
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      return data && typeof data === "object" ? data : {};
+    }catch(e){
+      return {};
+    }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){}
+  }
+
+  function parseNote(value){
+    if(value === null || value === undefined || String(value).trim() === ""){
+      return null;
+    }
+
+    const number = Number(String(value).trim().replace(",", "."));
+
+    if(!Number.isFinite(number)) return null;
+
+    if(number < 0 || number > 20) return null;
+
+    return number;
+  }
+
+  function format(value){
+    if(!Number.isFinite(value)) return "—";
+    return Number(value.toFixed(2)).toString().replace(".", ",");
+  }
+
+  function appreciation(value){
+    if(value >= 16) return "Excellent";
+    if(value >= 14) return "Bien";
+    if(value >= 12) return "Assez bien";
+    if(value >= 10) return "Passable";
+    return "Insuffisant";
+  }
+
+  function createGroups(){
+    const groups = [];
+
+    SUBJECTS.forEach(subject => {
+      let group = groups.find(g => g.name === subject.group);
+
+      if(!group){
+        group = {name:subject.group, items:[]};
+        groups.push(group);
+      }
+
+      group.items.push(subject);
+    });
+
+    return groups;
+  }
+
+  function render(){
+    subjectsEl.innerHTML = "";
+
+    createGroups().forEach(group => {
+      const section = document.createElement("section");
+      section.className = "section";
+
+      const title = document.createElement("h2");
+      title.className = "section-title";
+      title.innerHTML =
+        `<span>${group.name}</span><span class="section-count">${group.items.length} matière${group.items.length > 1 ? "s" : ""}</span>`;
+
+      const list = document.createElement("div");
+      list.className = "subject-list";
+
+      group.items.forEach(subject => {
+        const card = document.createElement("article");
+        card.className = "subject";
+
+        const saved = state[subject.id] || {};
+
+        card.innerHTML = `
+          <div class="subject-main">
+            <div class="subject-head">
+              <span class="subject-name">${subject.name}</span>
+              <span class="coef">COEF ${format(subject.coef)}</span>
+            </div>
+
+            <div class="notes">
+              <div class="note-box">
+                <label for="${subject.id}-s1">SÉQUENCE 1</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s1"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="—"
+                  value="${saved.s1 != null ? format(saved.s1) : ""}"
+                >
+              </div>
+
+              <div class="note-box">
+                <label for="${subject.id}-s2">SÉQUENCE 2</label>
+                <input
+                  class="note-input"
+                  id="${subject.id}-s2"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="—"
+                  value="${saved.s2 != null ? format(saved.s2) : ""}"
+                >
+              </div>
+            </div>
+
+            <div class="hint" id="${subject.id}-hint"></div>
+          </div>
+
+          <div class="summary">
+            <span>Coefficient pris en compte après calcul</span>
+            <strong>${format(subject.coef)}</strong>
+          </div>
+        `;
+
+        list.appendChild(card);
+
+        const s1 = card.querySelector(`#${subject.id}-s1`);
+        const s2 = card.querySelector(`#${subject.id}-s2`);
+        const hint = card.querySelector(`#${subject.id}-hint`);
+
+        function handleInput(){
+          const v1 = parseNote(s1.value);
+          const v2 = parseNote(s2.value);
+
+          state[subject.id] = {
+            s1: v1,
+            s2: v2
+          };
+
+          save();
+          const ok1 = validateInput(s1);
+          const ok2 = validateInput(s2);
+          hint.textContent = (ok1 && ok2) ? "" : "Note invalide : saisis un nombre entre 0 et 20.";
+          updateProgress();
+
+          // Une modification rend le résultat précédent obsolète.
+          result.classList.remove("show");
+        }
+
+        s1.addEventListener("input", handleInput);
+        s2.addEventListener("input", handleInput);
+
+        s1.addEventListener("blur", () => normalizeInput(s1));
+        s2.addEventListener("blur", () => normalizeInput(s2));
+      });
+
+      section.appendChild(title);
+      section.appendChild(list);
+      subjectsEl.appendChild(section);
+    });
+
+    updateProgress();
+  }
+
+  function normalizeInput(input){
+    const value = parseNote(input.value);
+
+    if(input.value.trim() === ""){
+      input.value = "";
+      input.classList.remove("invalid");
+      return;
+    }
+
+    if(value === null){
+      input.classList.add("invalid");
+      return;
+    }
+
+    input.value = format(value);
+    input.classList.remove("invalid");
+
+    const id = input.id;
+    const split = id.lastIndexOf("-");
+    const subjectId = id.substring(0, split);
+    const sequence = id.substring(split + 1);
+
+    if(!state[subjectId]) state[subjectId] = {};
+    state[subjectId][sequence] = value;
+    save();
+  }
+
+  function validateInput(input){
+    if(input.value === "") {
+      input.classList.remove("invalid");
+      return true;
+    }
+
+    const value = parseNote(input.value);
+    const valid = value !== null && value >= 0 && value <= 20;
+
+    input.classList.toggle("invalid", !valid);
+    return valid;
+  }
+
+  function updateProgress(){
+    let filled = 0;
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+
+      if(parseNote(entry.s1) !== null) filled++;
+      if(parseNote(entry.s2) !== null) filled++;
+    });
+
+    const percent = (filled / TOTAL_FIELDS) * 100;
+
+    progressValue.textContent = `${filled} / ${TOTAL_FIELDS}`;
+    progressFill.style.width = `${percent}%`;
+  }
+
+  function calculate(){
+    let weightedPoints = 0;
+    let usedCoef = 0;
+    let incomplete = [];
+
+    SUBJECTS.forEach(subject => {
+      const entry = state[subject.id] || {};
+      const s1 = parseNote(entry.s1);
+      const s2 = parseNote(entry.s2);
+
+      if(s1 === null || s2 === null){
+        incomplete.push(subject.name);
+        return;
+      }
+
+      const trimesterAverage = (s1 + s2) / 2;
+
+      weightedPoints += trimesterAverage * subject.coef;
+      usedCoef += subject.coef;
+    });
+
+    if(usedCoef === 0){
+      resultNumber.innerHTML = `—<small>/20</small>`;
+      resultAppreciation.textContent = "";
+      resultPoints.textContent = "0";
+      resultCoef.textContent = `0 / ${format(TOTAL_COEF)}`;
+      resultMessage.textContent = "Renseigne au moins une matière avec ses deux séquences.";
+      result.classList.add("show");
+      result.scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+
+    const average = weightedPoints / usedCoef;
+
+    resultNumber.innerHTML = `${format(average)}<small>/20</small>`;
+    resultAppreciation.textContent = appreciation(average);
+    resultPoints.textContent = format(weightedPoints);
+    resultCoef.textContent = `${format(usedCoef)} / ${format(TOTAL_COEF)}`;
+
+    if(incomplete.length === 0){
+      resultMessage.textContent =
+        "Toutes les matières sont prises en compte.";
+    }else{
+      resultMessage.textContent =
+        `${incomplete.length} matière${incomplete.length > 1 ? "s" : ""} non comptabilisée${incomplete.length > 1 ? "s" : ""} car les deux séquences ne sont pas renseignées.`;
+    }
+
+    result.classList.add("show");
+    result.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  document.getElementById("calculateBtnT").addEventListener("click", calculate);
+
+  document.getElementById("resetBtnT").addEventListener("click", () => {
+    if(!confirm("Effacer toutes les notes ?")) return;
+
+    state = {};
+
+    try{
+      localStorage.removeItem(STORAGE_KEY);
+    }catch(e){}
+
+    render();
+    result.classList.remove("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+
+  render();
+})();
+</script>
+
 <!-- ===================== AJOUT : gestion des onglets (seule ligne étendue : "p" ajouté à panels) ===================== -->
 <script>
 (function(){
@@ -1594,7 +1978,8 @@ Tle A4 • par Afombo Jeff • 679740340
   const panels = {
     a4: document.getElementById("panel-a4"),
     d: document.getElementById("panel-d"),
-    p: document.getElementById("panel-p")
+    p: document.getElementById("panel-p"),
+    ti: document.getElementById("panel-ti")
   };
 
   function show(key, scroll){
@@ -1856,6 +2241,12 @@ Tle A4 • par Afombo Jeff • 679740340
       ["d-physique","Physique",2],["d-informatique","Informatique",2],["d-anglais","Anglais",3],
       ["d-lfr","Langue française",1],["d-litterature","Littérature",2],["d-philosophie","Philosophie",2],
       ["d-geographie","Géographie",2],["d-ecm","ECM",2],["d-eps","EPS",2],["d-tm","TM",1]
+    ]},
+    ti:{label:"Tle TI", key:"tleTINotesV1", subjects:[
+      ["t-maths","Mathématiques",4],["t-physique","Physique",2],["t-chimie","Chimie",1],
+      ["t-programmation","Programmation",3],["t-si","Système d'information",4],["t-risi","RISI",2],
+      ["t-cpi","CPI",2],["t-ecm","ECM",2],["t-geographie","Géographie",2],["t-philosophie","Philosophie",3],
+      ["t-litterature","Littérature",1.5],["t-langue","Langue",1.5],["t-anglais","Anglais",3],["t-eps","EPS",2]
     ]},
     p:{label:"1ère A4", key:"prem1A4NotesV1", subjects:[
       ["p-anglais","Anglais",4],["p-lv2","Langue vivante 2",3],["p-lfr","Langue française",2],["p-lcn","LCN",1],
