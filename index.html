@@ -2015,7 +2015,7 @@ Tle A4 • par Afombo Jeff • 679740340
 })();
 </script>
 
-<!-- ===================== NOUVEAU : BULL (assistant IA Gemini) — code de base non modifié ===================== -->
+<!-- ===================== NOUVEAU : BULL (assistant IA Gemini + connexion Supabase) — code de base non modifié ===================== -->
 <style>
 .bull-fab{
   position:fixed;
@@ -2192,6 +2192,37 @@ Tle A4 • par Afombo Jeff • 679740340
   border:0;border-radius:14px;cursor:pointer;font-size:18px;
 }
 .bull-send:disabled{opacity:.5}
+
+.bull-auth{display:none;flex:1;flex-direction:column;gap:10px;padding:18px 16px;overflow-y:auto}
+.bull-sheet.logged-out .bull-auth{display:flex}
+.bull-sheet.logged-out .bull-messages,
+.bull-sheet.logged-out .bull-chips,
+.bull-sheet.logged-out .bull-input-row,
+.bull-sheet.logged-out #bullLogout,
+.bull-sheet.logged-out #bullClear{display:none}
+.bull-auth h2{margin:0;color:var(--ink);font-family:Georgia,serif;font-size:20px;line-height:1.2}
+.bull-auth p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.bull-auth input[type=text],.bull-auth input[type=email],.bull-auth input[type=password]{
+  width:100%;height:46px;padding:0 12px;color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:12px;outline:none;font-size:15px;
+}
+.bull-auth input:focus{border-color:var(--ink)}
+.bull-auth #bullName{display:none}
+.bull-auth.signup #bullName{display:block}
+.bull-google{
+  min-height:48px;color:var(--ink);background:#fff;border:1px solid var(--line);
+  border-radius:14px;cursor:pointer;font-size:14px;font-weight:800;
+}
+.bull-or{text-align:center;color:var(--muted);font-size:11px}
+.bull-switch{display:flex;gap:6px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.bull-switch button{flex:1;min-height:36px;color:var(--muted);background:transparent;border:0;border-radius:9px;cursor:pointer;font-size:13px;font-weight:800}
+.bull-switch button.on{color:#fff;background:var(--ink)}
+.bull-consent{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.4}
+.bull-consent input{margin-top:2px}
+.bull-main{min-height:48px;color:#fff;background:var(--ink);border:0;border-radius:14px;cursor:pointer;font-size:14px;font-weight:800}
+.bull-main:disabled,.bull-google:disabled{opacity:.6}
+.bull-auth-msg{min-height:16px;color:var(--red);font-size:12px;line-height:1.4}
+.bull-auth-msg.ok{color:var(--green)}
 </style>
 
 <button class="bull-fab" id="bullFab" type="button" aria-label="Ouvrir Bull, l'assistant IA">
@@ -2199,14 +2230,36 @@ Tle A4 • par Afombo Jeff • 679740340
 </button>
 
 <div class="bull-overlay" id="bullOverlay">
-  <div class="bull-sheet" role="dialog" aria-label="Bull, assistant IA">
+  <div class="bull-sheet logged-out" role="dialog" aria-label="Bull, assistant IA">
     <div class="bull-head">
       <div class="bull-avatar">B</div>
       <div class="bull-title">
         <strong>Bull</strong>
         <span id="bullSubtitle">Ton coach de révision</span>
       </div>
+      <button class="bull-icon" id="bullClear" type="button" aria-label="Effacer la conversation" title="Effacer la conversation">🗑</button>
+      <button class="bull-icon" id="bullLogout" type="button" aria-label="Se déconnecter" title="Se déconnecter">⎋</button>
       <button class="bull-icon" id="bullClose" type="button" aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="bull-auth" id="bullAuth">
+      <h2>Connecte-toi pour discuter avec Bull</h2>
+      <p>Ton compte permet à Bull de se souvenir de tes conversations et de retrouver tes notes sur tous tes appareils.</p>
+      <button class="bull-google" id="bullGoogle" type="button">Continuer avec Google</button>
+      <div class="bull-or">ou avec ton email</div>
+      <div class="bull-switch">
+        <button class="on" id="bullModeLogin" type="button">Connexion</button>
+        <button id="bullModeSignup" type="button">Inscription</button>
+      </div>
+      <input id="bullName" type="text" autocomplete="given-name" placeholder="Ton prénom">
+      <input id="bullEmail" type="email" autocomplete="email" placeholder="Email">
+      <input id="bullPass" type="password" autocomplete="current-password" placeholder="Mot de passe (6 caractères min.)">
+      <label class="bull-consent">
+        <input type="checkbox" id="bullConsent">
+        <span>J'accepte que mes notes et mes conversations avec Bull soient enregistrées dans mon compte (obligatoire pour s'inscrire).</span>
+      </label>
+      <button class="bull-main" id="bullSubmit" type="button">Se connecter</button>
+      <div class="bull-auth-msg" id="bullAuthMsg"></div>
     </div>
 
     <div class="bull-messages" id="bullMessages"></div>
@@ -2224,6 +2277,7 @@ Tle A4 • par Afombo Jeff • 679740340
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 (function(){
   "use strict";
@@ -2257,6 +2311,11 @@ Tle A4 • par Afombo Jeff • 679740340
   };
 
   // URL de ton proxy (Cloudflare Worker) : la clé Gemini reste cachée côté serveur.
+  const SUPABASE_URL = "https://hkmkdtbcxzliebjtujoc.supabase.co";
+  // Clé publique (publishable). Le dernier caractère était ambigu sur la photo (I, l ou 1) : Bull teste les 3 automatiquement.
+  const SUPABASE_KEY_BASE = "sb_publishable_v4ok2LayDxyGaH3gbh7cMQ_jy4m8KZ";
+  const SUPABASE_KEY_CANDIDATES = [SUPABASE_KEY_BASE + "I", SUPABASE_KEY_BASE + "l", SUPABASE_KEY_BASE + "1"];
+  const SUPABASE_ANON_KEY = SUPABASE_KEY_CANDIDATES[0];
   const PROXY_URL = "https://bull-proxy.afombojeff.workers.dev";
 
   const PROMPTS = {
@@ -2439,19 +2498,232 @@ ${md(text)}
     subtitle.textContent = `${r.label} · ${r.average === null ? "moyenne —" : "moyenne " + fmt(r.average) + "/20"}`;
   }
 
+  const sheet = overlay.querySelector(".bull-sheet");
+  const authBox = $("bullAuth");
+
+  /* ---------- Supabase : connexion ---------- */
+  const configured = SUPABASE_URL.indexOf("VOTRE-PROJET") === -1 && SUPABASE_ANON_KEY.indexOf("VOTRE-CLE") === -1;
+  let sb = null, session = null, mode = "login", historyLoaded = false;
+
+  async function pickKey(){
+    for(const k of SUPABASE_KEY_CANDIDATES){
+      try{
+        const r = await fetch(SUPABASE_URL + "/auth/v1/settings", {headers:{apikey:k}});
+        if(r.ok){ return {key:k, settings: await r.json().catch(() => ({}))}; }
+      }catch(e){ break; }
+    }
+    return {key:SUPABASE_ANON_KEY, settings:{}};
+  }
+
+  function authMsg(text, ok){
+    const el = $("bullAuthMsg");
+    el.textContent = text || "";
+    el.classList.toggle("ok", !!ok);
+  }
+  function authBusy(on){
+    $("bullSubmit").disabled = on;
+    $("bullGoogle").disabled = on;
+  }
+  function authError(e){
+    const m = String((e && e.message) || e || "");
+    if(/invalid login credentials/i.test(m)) return "Email ou mot de passe incorrect.";
+    if(/already registered|already been registered/i.test(m)) return "Un compte existe déjà avec cet email. Connecte-toi.";
+    if(/email not confirmed/i.test(m)) return "Confirme d'abord ton email (regarde ta boîte de réception).";
+    if(/rate limit|too many/i.test(m)) return "Trop de tentatives. Réessaie dans quelques minutes.";
+    if(/password/i.test(m) && /(characters|short|weak)/i.test(m)) return "Mot de passe trop faible (6 caractères minimum).";
+    if(/provider is not enabled|unsupported provider/i.test(m)) return "La connexion Google n'est pas encore activée.";
+    return "Erreur : " + m;
+  }
+  function setMode(m){
+    mode = m;
+    authBox.classList.toggle("signup", m === "signup");
+    $("bullModeLogin").classList.toggle("on", m === "login");
+    $("bullModeSignup").classList.toggle("on", m === "signup");
+    $("bullSubmit").textContent = m === "signup" ? "Créer mon compte" : "Se connecter";
+    $("bullPass").setAttribute("autocomplete", m === "signup" ? "new-password" : "current-password");
+    authMsg("");
+  }
+
+  async function submitAuth(){
+    if(!sb){ authMsg("Connexion indisponible pour le moment (configuration manquante)."); return; }
+    const email = $("bullEmail").value.trim();
+    const pass = $("bullPass").value;
+    if(!email || pass.length < 6){ authMsg("Entre un email valide et un mot de passe d'au moins 6 caractères."); return; }
+    if(mode === "signup" && !$("bullConsent").checked){ authMsg("Coche la case pour accepter l'enregistrement de tes données."); return; }
+
+    authBusy(true);
+    authMsg("");
+    try{
+      if(mode === "signup"){
+        const {data, error} = await sb.auth.signUp({email, password:pass, options:{data:{full_name:$("bullName").value.trim()}}});
+        if(error) throw error;
+        if(!data.session) authMsg("Compte créé ✅ Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.", true);
+      }else{
+        const {error} = await sb.auth.signInWithPassword({email, password:pass});
+        if(error) throw error;
+      }
+    }catch(e){
+      authMsg(authError(e));
+    }finally{
+      authBusy(false);
+    }
+  }
+
+  async function googleAuth(){
+    if(!sb){ authMsg("Connexion indisponible pour le moment (configuration manquante)."); return; }
+    if(!$("bullConsent").checked){ authMsg("Coche la case pour accepter l'enregistrement de tes données."); return; }
+    try{ sessionStorage.setItem("bullOpenAfterAuth", "1"); }catch(e){}
+    const {error} = await sb.auth.signInWithOAuth({provider:"google", options:{redirectTo: location.origin + location.pathname}});
+    if(error) authMsg(authError(error));
+  }
+
+  function applySession(sess){
+    const was = !!session;
+    session = sess || null;
+    sheet.classList.toggle("logged-out", !session);
+    if(session && !was){
+      loadHistory();
+      syncNotes();
+      let flag = false;
+      try{ flag = sessionStorage.getItem("bullOpenAfterAuth") === "1"; sessionStorage.removeItem("bullOpenAfterAuth"); }catch(e){}
+      if(flag) openBull();
+    }
+    if(!session && was){
+      historyLoaded = false;
+      messagesEl.innerHTML = "";
+      greeted = false;
+    }
+  }
+
+  async function logout(){
+    if(!sb || !session) return;
+    if(!confirm("Te déconnecter ? Tes notes et tes conversations restent sauvegardées dans ton compte.")) return;
+    try{ clearTimeout(syncTimer); await pushNotes(); }catch(e){}
+    try{ await sb.auth.signOut(); }catch(e){}
+    try{
+      Object.keys(CLASSES).forEach(cls => {
+        localStorage.removeItem(CLASSES[cls].key);
+        localStorage.removeItem("bullTs_" + cls);
+      });
+    }catch(e){}
+    location.reload();
+  }
+
+  /* ---------- Historique des conversations ---------- */
+  const GREETING = "Salut, je suis **Bull** 👋\n\nJe lis tes notes de l'onglet ouvert, je repère tes points faibles et je te propose des exercices corrigés ou des cours à exporter en PDF.\n\nChoisis une action ci-dessous ou pose-moi une question.";
+
+  async function loadHistory(){
+    if(!sb || !session || historyLoaded) return;
+    historyLoaded = true;
+    messagesEl.innerHTML = "";
+    const {data, error} = await sb.from("messages").select("role,content").order("id", {ascending:false}).limit(30);
+    const rows = (!error && data) ? data.slice().reverse() : [];
+    if(rows.length){
+      rows.forEach(r => { if(r.role === "user") addUser(r.content); else addBot(r.content); });
+      addBot("Content de te revoir 👋 On reprend où on s'était arrêtés ?");
+    }else{
+      addBot(GREETING);
+    }
+    greeted = true;
+  }
+
+  async function clearHistory(){
+    if(!sb || !session) return;
+    if(!confirm("Effacer toute ta conversation avec Bull ? Cette action est définitive.")) return;
+    const {error} = await sb.from("messages").delete().neq("id", 0);
+    if(error){ addError("Impossible d'effacer la conversation pour le moment."); return; }
+    messagesEl.innerHTML = "";
+    addBot(GREETING);
+  }
+
+  /* ---------- Sauvegarde des notes (sans toucher au code des onglets) ---------- */
+  const lastPushed = {};
+  let syncReady = false, syncTimer = null;
+
+  function rawOf(key){ try{ return localStorage.getItem(key) || ""; }catch(e){ return ""; } }
+  function hasData(raw){
+    try{
+      const o = JSON.parse(raw || "{}");
+      return Object.keys(o).some(k => o[k] && (o[k].s1 != null || o[k].s2 != null));
+    }catch(e){ return false; }
+  }
+
+  async function syncNotes(){
+    if(!sb || !session) return;
+    const {data, error} = await sb.from("notes").select("storage_key,data,updated_at");
+    if(error) return;
+    const cloud = {};
+    (data || []).forEach(r => { cloud[r.storage_key] = r; });
+
+    let restored = false;
+    Object.keys(CLASSES).forEach(cls => {
+      const row = cloud[cls];
+      let localTs = "";
+      try{ localTs = localStorage.getItem("bullTs_" + cls) || ""; }catch(e){}
+      if(row && (!localTs || new Date(row.updated_at) > new Date(localTs))){
+        try{
+          localStorage.setItem(CLASSES[cls].key, JSON.stringify(row.data || {}));
+          localStorage.setItem("bullTs_" + cls, row.updated_at);
+          restored = true;
+        }catch(e){}
+      }
+    });
+    if(restored){ location.reload(); return; }
+
+    Object.keys(CLASSES).forEach(cls => {
+      const raw = rawOf(CLASSES[cls].key);
+      lastPushed[cls] = (cloud[cls] || !hasData(raw)) ? raw : "__new__";
+    });
+    syncReady = true;
+    await pushNotes();
+  }
+
+  async function pushNotes(){
+    if(!sb || !session || !syncReady) return;
+    const rows = [];
+    Object.keys(CLASSES).forEach(cls => {
+      const raw = rawOf(CLASSES[cls].key);
+      if(raw === lastPushed[cls]) return;
+      let obj = {};
+      try{ obj = raw ? JSON.parse(raw) : {}; }catch(e){ return; }
+      rows.push({cls, raw, obj});
+    });
+    if(!rows.length) return;
+    const ts = new Date().toISOString();
+    const {error} = await sb.from("notes").upsert(
+      rows.map(r => ({user_id:session.user.id, storage_key:r.cls, data:r.obj, updated_at:ts})),
+      {onConflict:"user_id,storage_key"}
+    );
+    if(!error){
+      rows.forEach(r => {
+        lastPushed[r.cls] = r.raw;
+        try{ localStorage.setItem("bullTs_" + r.cls, ts); }catch(e){}
+      });
+    }
+  }
+
+  function schedulePush(delay){
+    if(!syncReady) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushNotes, delay);
+  }
+  document.addEventListener("input", () => schedulePush(1500));
+  document.addEventListener("click", e => {
+    if(e.target.closest && e.target.closest("#resetBtn,#resetBtnD,#resetBtnP,#resetBtnT")) setTimeout(() => schedulePush(500), 300);
+  });
+
+  /* ---------- Interface ---------- */
   function openBull(){
     overlay.classList.add("open");
     refreshSubtitle();
-    if(!greeted){
-      greeted = true;
-      addBot("Salut, je suis **Bull** 👋\n\nJe lis tes notes de l'onglet ouvert, je repère tes points faibles et je te propose des exercices corrigés ou des cours à exporter en PDF.\n\nChoisis une action ci-dessous ou pose-moi une question.");
-    }
+    if(session) loadHistory();
   }
   function closeBull(){ overlay.classList.remove("open"); }
 
-  /* ---------- Appel Gemini ---------- */
+  /* ---------- Appel Gemini (via le proxy, avec le jeton de connexion) ---------- */
   async function ask(userText){
     if(busy) return;
+    if(!sb || !session){ addError("Connecte-toi pour discuter avec Bull."); return; }
     if(PROXY_URL.indexOf("TON-COMPTE") !== -1){
       addError("Bull n'est pas encore configuré (adresse du proxy manquante).");
       return;
@@ -2460,39 +2732,40 @@ ${md(text)}
     busy = true;
     sendBtn.disabled = true;
     addUser(userText);
-    history.push({role:"user", parts:[{text:userText}]});
     setTyping(true);
     refreshSubtitle();
 
     try{
+      const {data:sd} = await sb.auth.getSession();
+      const token = sd && sd.session ? sd.session.access_token : "";
+      if(!token){
+        setTyping(false);
+        addError("Session expirée. Reconnecte-toi.");
+        return;
+      }
+
       const res = await fetch(PROXY_URL, {
         method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({report:reportText(getReport()), contents:history.slice(-14)})
+        headers:{"Content-Type":"application/json", "Authorization":"Bearer " + token},
+        body:JSON.stringify({report:reportText(getReport()), message:userText, class_key:((document.querySelector(".tab.active")||{dataset:{}}).dataset.tab || null)})
       });
 
       const data = await res.json().catch(() => ({}));
       setTyping(false);
 
       if(!res.ok){
-        history.pop();
         addError(data && data.error ? data.error : "Bull est indisponible pour le moment. Réessaie dans un instant.");
         return;
       }
 
       const text = (data.text || "").trim();
-
       if(!text){
-        history.pop();
         addError("Bull n'a pas pu répondre à cette demande. Reformule-la.");
         return;
       }
-
-      history.push({role:"model", parts:[{text}]});
       addBot(text);
     }catch(e){
       setTyping(false);
-      history.pop();
       addError("Connexion impossible. Vérifie ta connexion internet.");
     }finally{
       busy = false;
@@ -2513,6 +2786,13 @@ ${md(text)}
   $("bullClose").addEventListener("click", closeBull);
   overlay.addEventListener("click", e => { if(e.target === overlay) closeBull(); });
 
+  $("bullModeLogin").addEventListener("click", () => setMode("login"));
+  $("bullModeSignup").addEventListener("click", () => setMode("signup"));
+  $("bullSubmit").addEventListener("click", submitAuth);
+  $("bullGoogle").addEventListener("click", googleAuth);
+  $("bullPass").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); submitAuth(); } });
+  $("bullLogout").addEventListener("click", logout);
+  $("bullClear").addEventListener("click", clearHistory);
 
   document.querySelectorAll(".bull-chip").forEach(chip => {
     chip.addEventListener("click", () => ask(PROMPTS[chip.dataset.action]));
@@ -2526,6 +2806,22 @@ ${md(text)}
     input.style.height = "auto";
     input.style.height = Math.min(input.scrollHeight, 110) + "px";
   });
+
+  if(configured && window.supabase){
+    pickKey().then(({key, settings}) => {
+      try{ sb = window.supabase.createClient(SUPABASE_URL, key); }catch(e){ sb = null; }
+      if(!sb) return;
+      // Masque le bouton Google tant qu'il n'est pas activé dans Supabase
+      const ext = settings && settings.external;
+      if(ext && ext.google === false){
+        $("bullGoogle").style.display = "none";
+        const or = document.querySelector(".bull-or");
+        if(or) or.style.display = "none";
+      }
+      sb.auth.getSession().then(({data}) => applySession(data.session));
+      sb.auth.onAuthStateChange((evt, sess) => applySession(sess));
+    });
+  }
 })();
 </script>
 
