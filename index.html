@@ -2015,7 +2015,7 @@ Tle A4 • par Afombo Jeff • 679740340
 })();
 </script>
 
-<!-- ===================== NOUVEAU : BULL (assistant IA Gemini + connexion Supabase) — code de base non modifié ===================== -->
+<!-- ===================== BULL : assistant IA Gemini + connexion Neon via Worker ===================== -->
 <style>
 .bull-fab{
   position:fixed;
@@ -2277,7 +2277,6 @@ Tle A4 • par Afombo Jeff • 679740340
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 (function(){
   "use strict";
@@ -2310,13 +2309,6 @@ Tle A4 • par Afombo Jeff • 679740340
     ]}
   };
 
-  // URL de ton proxy (Cloudflare Worker) : la clé Gemini reste cachée côté serveur.
-  const SUPABASE_URL = "https://hkmkdtbcxzliebjtujoc.supabase.co";
-  // Clé publique (publishable). Le dernier caractère était ambigu sur la photo (I, l ou 1) : Bull teste les 3 automatiquement.
-  const SUPABASE_KEY_BASE = "sb_publishable_v4ok2LayDxyGaH3gbh7cMQ_jy4m8KZ";
-  const SUPABASE_KEY_CANDIDATES = [SUPABASE_KEY_BASE + "I", SUPABASE_KEY_BASE + "l", SUPABASE_KEY_BASE + "1"];
-  const SUPABASE_ANON_KEY = SUPABASE_KEY_CANDIDATES[0];
-  const PROXY_URL = "https://bull-proxy.afombojeff.workers.dev";
 
   const PROMPTS = {
     analyse: "Analyse mes notes pour ma classe actuelle. Donne : 1) un bilan général avec ma moyenne, 2) mes points faibles classés par priorité (en tenant compte des coefficients), 3) mes points forts, 4) un plan de révision court et réaliste. Termine en me proposant des exercices ou un cours en PDF sur ma matière la plus faible.",
@@ -2501,18 +2493,24 @@ ${md(text)}
   const sheet = overlay.querySelector(".bull-sheet");
   const authBox = $("bullAuth");
 
-  /* ---------- Supabase : connexion ---------- */
-  const configured = SUPABASE_URL.indexOf("VOTRE-PROJET") === -1 && SUPABASE_ANON_KEY.indexOf("VOTRE-CLE") === -1;
-  let sb = null, session = null, mode = "login", historyLoaded = false;
+  /* ---------- Neon API : connexion et données ---------- */
+  const API_URL = "https://bull-proxy.afombojeff.workers.dev";
+  const TOKEN_KEY = "bullNeonTokenV1";
+  let session = null, mode = "login", historyLoaded = false;
 
-  async function pickKey(){
-    for(const k of SUPABASE_KEY_CANDIDATES){
-      try{
-        const r = await fetch(SUPABASE_URL + "/auth/v1/settings", {headers:{apikey:k}});
-        if(r.ok){ return {key:k, settings: await r.json().catch(() => ({}))}; }
-      }catch(e){ break; }
-    }
-    return {key:SUPABASE_ANON_KEY, settings:{}};
+  function getToken(){ return read(TOKEN_KEY); }
+  function saveToken(token){ store(TOKEN_KEY, token || null); }
+
+  async function api(path, method="GET", body=null){
+    const headers = {"Content-Type":"application/json"};
+    const token = getToken();
+    if(token) headers.Authorization = "Bearer " + token;
+    const options = {method, headers};
+    if(body !== null) options.body = JSON.stringify(body);
+    const response = await fetch(API_URL + path, options);
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `Erreur serveur (${response.status}).`);
+    return data;
   }
 
   function authMsg(text, ok){
@@ -2520,19 +2518,15 @@ ${md(text)}
     el.textContent = text || "";
     el.classList.toggle("ok", !!ok);
   }
-  function authBusy(on){
-    $("bullSubmit").disabled = on;
-    $("bullGoogle").disabled = on;
-  }
+  function authBusy(on){ $("bullSubmit").disabled = on; $("bullGoogle").disabled = on; }
   function authError(e){
     const m = String((e && e.message) || e || "");
-    if(/invalid login credentials/i.test(m)) return "Email ou mot de passe incorrect.";
-    if(/already registered|already been registered/i.test(m)) return "Un compte existe déjà avec cet email. Connecte-toi.";
-    if(/email not confirmed/i.test(m)) return "Confirme d'abord ton email (regarde ta boîte de réception).";
+    if(/email ou mot de passe incorrect|identifiants incorrects/i.test(m)) return "Email ou mot de passe incorrect.";
+    if(/compte existe déjà|already exists/i.test(m)) return "Un compte existe déjà avec cet email. Connecte-toi.";
+    if(/email invalide/i.test(m)) return "Entre une adresse email valide.";
+    if(/mot de passe/i.test(m) && /(6 caractères|faible|court)/i.test(m)) return "Mot de passe trop faible (6 caractères minimum).";
     if(/rate limit|too many/i.test(m)) return "Trop de tentatives. Réessaie dans quelques minutes.";
-    if(/password/i.test(m) && /(characters|short|weak)/i.test(m)) return "Mot de passe trop faible (6 caractères minimum).";
-    if(/provider is not enabled|unsupported provider/i.test(m)) return "La connexion Google n'est pas encore activée.";
-    return "Erreur : " + m;
+    return m || "Une erreur est survenue. Réessaie.";
   }
   function setMode(m){
     mode = m;
@@ -2545,36 +2539,26 @@ ${md(text)}
   }
 
   async function submitAuth(){
-    if(!sb){ authMsg("Connexion indisponible pour le moment (configuration manquante)."); return; }
-    const email = $("bullEmail").value.trim();
+    const email = $("bullEmail").value.trim().toLowerCase();
     const pass = $("bullPass").value;
     if(!email || pass.length < 6){ authMsg("Entre un email valide et un mot de passe d'au moins 6 caractères."); return; }
     if(mode === "signup" && !$("bullConsent").checked){ authMsg("Coche la case pour accepter l'enregistrement de tes données."); return; }
-
-    authBusy(true);
-    authMsg("");
+    if(mode === "signup" && !$("bullName").value.trim()){ authMsg("Entre ton prénom pour créer le compte."); return; }
+    authBusy(true); authMsg("");
     try{
-      if(mode === "signup"){
-        const {data, error} = await sb.auth.signUp({email, password:pass, options:{data:{full_name:$("bullName").value.trim()}}});
-        if(error) throw error;
-        if(!data.session) authMsg("Compte créé ✅ Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.", true);
-      }else{
-        const {error} = await sb.auth.signInWithPassword({email, password:pass});
-        if(error) throw error;
-      }
-    }catch(e){
-      authMsg(authError(e));
-    }finally{
-      authBusy(false);
-    }
+      const data = await api(mode === "signup" ? "/auth/signup" : "/auth/login", "POST", {
+        email, password:pass, full_name:$("bullName").value.trim()
+      });
+      if(!data.token || !data.user) throw new Error("Réponse de connexion invalide.");
+      saveToken(data.token);
+      applySession({access_token:data.token, user:data.user});
+      authMsg(mode === "signup" ? "Compte créé et connecté ✅" : "Connexion réussie ✅", true);
+    }catch(e){ authMsg(authError(e)); }
+    finally{ authBusy(false); }
   }
 
-  async function googleAuth(){
-    if(!sb){ authMsg("Connexion indisponible pour le moment (configuration manquante)."); return; }
-    if(!$("bullConsent").checked){ authMsg("Coche la case pour accepter l'enregistrement de tes données."); return; }
-    try{ sessionStorage.setItem("bullOpenAfterAuth", "1"); }catch(e){}
-    const {error} = await sb.auth.signInWithOAuth({provider:"google", options:{redirectTo: location.origin + location.pathname}});
-    if(error) authMsg(authError(error));
+  function googleAuth(){
+    authMsg("La connexion Google nécessite une configuration OAuth distincte. Utilise la connexion par email pour le moment.");
   }
 
   function applySession(sess){
@@ -2582,94 +2566,83 @@ ${md(text)}
     session = sess || null;
     sheet.classList.toggle("logged-out", !session);
     if(session && !was){
+      historyLoaded = false;
       loadHistory();
       syncNotes();
       let flag = false;
       try{ flag = sessionStorage.getItem("bullOpenAfterAuth") === "1"; sessionStorage.removeItem("bullOpenAfterAuth"); }catch(e){}
       if(flag) openBull();
     }
-    if(!session && was){
-      historyLoaded = false;
-      messagesEl.innerHTML = "";
-      greeted = false;
-    }
+    if(!session && was){ historyLoaded = false; messagesEl.innerHTML = ""; greeted = false; }
+  }
+
+  async function restoreSession(){
+    const token = getToken();
+    if(!token) { applySession(null); return; }
+    try{
+      const data = await api("/auth/me");
+      if(data.user) applySession({access_token:token, user:data.user});
+      else { saveToken(null); applySession(null); }
+    }catch(e){ saveToken(null); applySession(null); }
   }
 
   async function logout(){
-    if(!sb || !session) return;
+    if(!session) return;
     if(!confirm("Te déconnecter ? Tes notes et tes conversations restent sauvegardées dans ton compte.")) return;
     try{ clearTimeout(syncTimer); await pushNotes(); }catch(e){}
-    try{ await sb.auth.signOut(); }catch(e){}
-    try{
-      Object.keys(CLASSES).forEach(cls => {
-        localStorage.removeItem(CLASSES[cls].key);
-        localStorage.removeItem("bullTs_" + cls);
-      });
-    }catch(e){}
+    try{ await api("/auth/logout", "POST", {}); }catch(e){}
+    saveToken(null);
+    try{ Object.keys(CLASSES).forEach(cls => { localStorage.removeItem(CLASSES[cls].key); localStorage.removeItem("bullTs_" + cls); }); }catch(e){}
+    session = null;
     location.reload();
   }
 
-  /* ---------- Historique des conversations ---------- */
   const GREETING = "Salut, je suis **Bull** 👋\n\nJe lis tes notes de l'onglet ouvert, je repère tes points faibles et je te propose des exercices corrigés ou des cours à exporter en PDF.\n\nChoisis une action ci-dessous ou pose-moi une question.";
 
   async function loadHistory(){
-    if(!sb || !session || historyLoaded) return;
-    historyLoaded = true;
-    messagesEl.innerHTML = "";
-    const {data, error} = await sb.from("messages").select("role,content").order("id", {ascending:false}).limit(30);
-    const rows = (!error && data) ? data.slice().reverse() : [];
-    if(rows.length){
-      rows.forEach(r => { if(r.role === "user") addUser(r.content); else addBot(r.content); });
-      addBot("Content de te revoir 👋 On reprend où on s'était arrêtés ?");
-    }else{
-      addBot(GREETING);
-    }
+    if(!session || historyLoaded) return;
+    historyLoaded = true; messagesEl.innerHTML = "";
+    try{
+      const data = await api("/api/messages?limit=30");
+      const rows = (data.messages || []).slice().reverse();
+      if(rows.length){ rows.forEach(r => { if(r.role === "user") addUser(r.content); else addBot(r.content); }); addBot("Content de te revoir 👋 On reprend où on s'était arrêtés ?"); }
+      else addBot(GREETING);
+    }catch(e){ addBot(GREETING); }
     greeted = true;
   }
 
   async function clearHistory(){
-    if(!sb || !session) return;
+    if(!session) return;
     if(!confirm("Effacer toute ta conversation avec Bull ? Cette action est définitive.")) return;
-    const {error} = await sb.from("messages").delete().neq("id", 0);
-    if(error){ addError("Impossible d'effacer la conversation pour le moment."); return; }
-    messagesEl.innerHTML = "";
-    addBot(GREETING);
+    try{ await api("/api/messages", "DELETE"); messagesEl.innerHTML = ""; addBot(GREETING); }
+    catch(e){ addError("Impossible d'effacer la conversation pour le moment."); }
   }
 
-  /* ---------- Sauvegarde des notes (sans toucher au code des onglets) ---------- */
+  /* ---------- Synchronisation des notes avec Neon ---------- */
   const lastPushed = {};
   let syncReady = false, syncTimer = null;
-
   function rawOf(key){ try{ return localStorage.getItem(key) || ""; }catch(e){ return ""; } }
   function hasData(raw){
-    try{
-      const o = JSON.parse(raw || "{}");
-      return Object.keys(o).some(k => o[k] && (o[k].s1 != null || o[k].s2 != null));
-    }catch(e){ return false; }
+    try{ const o = JSON.parse(raw || "{}"); return Object.keys(o).some(k => o[k] && (o[k].s1 != null || o[k].s2 != null)); }
+    catch(e){ return false; }
   }
 
   async function syncNotes(){
-    if(!sb || !session) return;
-    const {data, error} = await sb.from("notes").select("storage_key,data,updated_at");
-    if(error) return;
-    const cloud = {};
-    (data || []).forEach(r => { cloud[r.storage_key] = r; });
-
+    if(!session) return;
+    let cloud = {};
+    try{
+      const data = await api("/api/notes");
+      (data.notes || []).forEach(r => { cloud[r.storage_key] = r; });
+    }catch(e){ return; }
     let restored = false;
     Object.keys(CLASSES).forEach(cls => {
-      const row = cloud[cls];
-      let localTs = "";
+      const row = cloud[cls]; let localTs = "";
       try{ localTs = localStorage.getItem("bullTs_" + cls) || ""; }catch(e){}
       if(row && (!localTs || new Date(row.updated_at) > new Date(localTs))){
-        try{
-          localStorage.setItem(CLASSES[cls].key, JSON.stringify(row.data || {}));
-          localStorage.setItem("bullTs_" + cls, row.updated_at);
-          restored = true;
-        }catch(e){}
+        try{ localStorage.setItem(CLASSES[cls].key, JSON.stringify(row.data || {})); localStorage.setItem("bullTs_" + cls, row.updated_at); restored = true; }catch(e){}
       }
     });
     if(restored){ location.reload(); return; }
-
     Object.keys(CLASSES).forEach(cls => {
       const raw = rawOf(CLASSES[cls].key);
       lastPushed[cls] = (cloud[cls] || !hasData(raw)) ? raw : "__new__";
@@ -2679,113 +2652,53 @@ ${md(text)}
   }
 
   async function pushNotes(){
-    if(!sb || !session || !syncReady) return;
+    if(!session || !syncReady) return;
     const rows = [];
     Object.keys(CLASSES).forEach(cls => {
       const raw = rawOf(CLASSES[cls].key);
       if(raw === lastPushed[cls]) return;
-      let obj = {};
-      try{ obj = raw ? JSON.parse(raw) : {}; }catch(e){ return; }
+      let obj = {}; try{ obj = raw ? JSON.parse(raw) : {}; }catch(e){ return; }
       rows.push({cls, raw, obj});
     });
     if(!rows.length) return;
-    const ts = new Date().toISOString();
-    const {error} = await sb.from("notes").upsert(
-      rows.map(r => ({user_id:session.user.id, storage_key:r.cls, data:r.obj, updated_at:ts})),
-      {onConflict:"user_id,storage_key"}
-    );
-    if(!error){
-      rows.forEach(r => {
-        lastPushed[r.cls] = r.raw;
-        try{ localStorage.setItem("bullTs_" + r.cls, ts); }catch(e){}
-      });
-    }
+    try{
+      const data = await api("/api/notes", "PUT", {notes:rows.map(r => ({storage_key:r.cls, data:r.obj}))});
+      const ts = data.updated_at || new Date().toISOString();
+      rows.forEach(r => { lastPushed[r.cls] = r.raw; try{ localStorage.setItem("bullTs_" + r.cls, ts); }catch(e){} });
+    }catch(e){ /* Les notes restent dans localStorage si le réseau est indisponible. */ }
   }
 
-  function schedulePush(delay){
-    if(!syncReady) return;
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(pushNotes, delay);
-  }
+  function schedulePush(delay){ if(!syncReady) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushNotes, delay); }
   document.addEventListener("input", () => schedulePush(1500));
   document.addEventListener("click", e => {
     if(e.target.closest && e.target.closest("#resetBtn,#resetBtnD,#resetBtnP,#resetBtnT")) setTimeout(() => schedulePush(500), 300);
   });
 
-  /* ---------- Interface ---------- */
-  function openBull(){
-    overlay.classList.add("open");
-    refreshSubtitle();
-    if(session) loadHistory();
-  }
+  function openBull(){ overlay.classList.add("open"); refreshSubtitle(); if(session) loadHistory(); }
   function closeBull(){ overlay.classList.remove("open"); }
 
-  /* ---------- Appel Gemini (via le proxy, avec le jeton de connexion) ---------- */
   async function ask(userText){
     if(busy) return;
-    if(!sb || !session){ addError("Connecte-toi pour discuter avec Bull."); return; }
-    if(PROXY_URL.indexOf("TON-COMPTE") !== -1){
-      addError("Bull n'est pas encore configuré (adresse du proxy manquante).");
-      return;
-    }
-
-    busy = true;
-    sendBtn.disabled = true;
-    addUser(userText);
-    setTyping(true);
-    refreshSubtitle();
-
+    if(!session){ addError("Connecte-toi pour discuter avec Bull."); return; }
+    busy = true; sendBtn.disabled = true; addUser(userText); setTyping(true); refreshSubtitle();
     try{
-      const {data:sd} = await sb.auth.getSession();
-      const token = sd && sd.session ? sd.session.access_token : "";
-      if(!token){
-        setTyping(false);
-        addError("Session expirée. Reconnecte-toi.");
-        return;
-      }
-
-      const res = await fetch(PROXY_URL, {
-        method:"POST",
-        headers:{"Content-Type":"application/json", "Authorization":"Bearer " + token},
-        body:JSON.stringify({report:reportText(getReport()), message:userText, class_key:((document.querySelector(".tab.active")||{dataset:{}}).dataset.tab || null)})
+      const data = await api("/api/chat", "POST", {
+        report:reportText(getReport()), message:userText,
+        class_key:((document.querySelector(".tab.active")||{dataset:{}}).dataset.tab || null)
       });
-
-      const data = await res.json().catch(() => ({}));
       setTyping(false);
-
-      if(!res.ok){
-        addError(data && data.error ? data.error : "Bull est indisponible pour le moment. Réessaie dans un instant.");
-        return;
-      }
-
       const text = (data.text || "").trim();
-      if(!text){
-        addError("Bull n'a pas pu répondre à cette demande. Reformule-la.");
-        return;
-      }
+      if(!text){ addError("Bull n'a pas pu répondre à cette demande. Reformule-la."); return; }
       addBot(text);
-    }catch(e){
-      setTyping(false);
-      addError("Connexion impossible. Vérifie ta connexion internet.");
-    }finally{
-      busy = false;
-      sendBtn.disabled = false;
-    }
+    }catch(e){ setTyping(false); addError(e.message || "Connexion impossible. Vérifie ta connexion internet."); }
+    finally{ busy = false; sendBtn.disabled = false; }
   }
 
-  function sendFromInput(){
-    const t = input.value.trim();
-    if(!t) return;
-    input.value = "";
-    input.style.height = "auto";
-    ask(t);
-  }
+  function sendFromInput(){ const t = input.value.trim(); if(!t) return; input.value = ""; input.style.height = "auto"; ask(t); }
 
-  /* ---------- Événements ---------- */
   fab.addEventListener("click", openBull);
   $("bullClose").addEventListener("click", closeBull);
   overlay.addEventListener("click", e => { if(e.target === overlay) closeBull(); });
-
   $("bullModeLogin").addEventListener("click", () => setMode("login"));
   $("bullModeSignup").addEventListener("click", () => setMode("signup"));
   $("bullSubmit").addEventListener("click", submitAuth);
@@ -2793,35 +2706,13 @@ ${md(text)}
   $("bullPass").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); submitAuth(); } });
   $("bullLogout").addEventListener("click", logout);
   $("bullClear").addEventListener("click", clearHistory);
-
-  document.querySelectorAll(".bull-chip").forEach(chip => {
-    chip.addEventListener("click", () => ask(PROMPTS[chip.dataset.action]));
-  });
-
+  document.querySelectorAll(".bull-chip").forEach(chip => chip.addEventListener("click", () => ask(PROMPTS[chip.dataset.action])));
   sendBtn.addEventListener("click", sendFromInput);
-  input.addEventListener("keydown", e => {
-    if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); sendFromInput(); }
-  });
-  input.addEventListener("input", () => {
-    input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 110) + "px";
-  });
+  input.addEventListener("keydown", e => { if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); sendFromInput(); } });
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 110) + "px"; });
 
-  if(configured && window.supabase){
-    pickKey().then(({key, settings}) => {
-      try{ sb = window.supabase.createClient(SUPABASE_URL, key); }catch(e){ sb = null; }
-      if(!sb) return;
-      // Masque le bouton Google tant qu'il n'est pas activé dans Supabase
-      const ext = settings && settings.external;
-      if(ext && ext.google === false){
-        $("bullGoogle").style.display = "none";
-        const or = document.querySelector(".bull-or");
-        if(or) or.style.display = "none";
-      }
-      sb.auth.getSession().then(({data}) => applySession(data.session));
-      sb.auth.onAuthStateChange((evt, sess) => applySession(sess));
-    });
-  }
+  // Google OAuth n'est pas configuré dans cette migration Neon : on conserve l'élément UI sans casser le formulaire.
+  restoreSession();
 })();
 </script>
 
